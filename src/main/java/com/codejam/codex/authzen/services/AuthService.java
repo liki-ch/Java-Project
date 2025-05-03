@@ -55,7 +55,6 @@ public class AuthService {
      * @return true if registration was successful, false otherwise.
      */
     public UserResponse registerUser(RegisterRequest request) {
-
         List<Role> roles = roleRepository.findByName("ROLE_USER");
         if (roles.isEmpty()) {
             throw new RuntimeException("Default role not found: ROLE_USER");
@@ -70,14 +69,14 @@ public class AuthService {
         user.setCreatedAt(new java.sql.Timestamp(System.currentTimeMillis()));
 
         UserRole userRoleMapping = new UserRole();
-        userRoleMapping.setUser(new User());
+        userRoleMapping.setUser(user); // Fixed: set the current user
         userRoleMapping.setRole(userRole);
         user.getUserRoles().add(userRoleMapping);
 
-        userRepository.save(new User());
-        List<String> permissionNames = new ArrayList<>();
+        User savedUser = userRepository.save(user); // Fixed: save the actual user
+        List<String> permissionNames = userRepository.findPermissionNamesByUsername(user.getUsername());
 
-        return UserResponse.fromEntity(new User(), permissionNames);
+        return UserResponse.fromEntity(savedUser, permissionNames); // Fixed: return the saved user
     }
 
 
@@ -91,7 +90,7 @@ public class AuthService {
         Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
         if (userOptional.isPresent()) {
             User user = userOptional.get();
-            if (request.getPassword().equals(user.getPassword())) {
+            if (passwordEncoder.matches(request.getPassword(), user.getPassword())) {
                 UserResponse userResponse = userService.loadUserByUsername(user.getEmail());
                 List<String> permissionNames = userRepository.findPermissionNamesByUsername(user.getUsername());
                 userResponse.setPermissions(permissionNames);
@@ -128,13 +127,28 @@ public class AuthService {
                 if (existingUserOpt.isPresent()) {
                     user = existingUserOpt.get();
                 } else {
+                    // Create new user with default role
+                    List<Role> roles = roleRepository.findByName("ROLE_USER");
+                    if (roles.isEmpty()) {
+                        throw new RuntimeException("Default role not found: ROLE_USER");
+                    }
+                    Role userRole = roles.get(0);
+                    
                     user = User.builder()
                             .username(githubLogin)
                             .email(githubEmail)
+                            .password(passwordEncoder.encode(UUID.randomUUID().toString()))
                             .isActive(true)
                             .isLocked(false)
+                            .createdAt(new Timestamp(System.currentTimeMillis()))
                             .userRoles(new HashSet<>())
                             .build();
+                    
+                    UserRole userRoleMapping = new UserRole();
+                    userRoleMapping.setUser(user);
+                    userRoleMapping.setRole(userRole);
+                    user.getUserRoles().add(userRoleMapping);
+                    
                     user = userRepository.save(user);
                 }
                 oauthProviderRepository.save(OauthProvider.builder()
@@ -147,6 +161,7 @@ public class AuthService {
             UserResponse userResponse = userService.loadUserByUsername(user.getEmail());
             String accessToken = jwtService.generateAccessToken(userResponse);
             String refreshToken = jwtService.generateRefreshToken(userResponse);
+            saveRefreshToken(user, refreshToken);
 
             return new TokenResponse(accessToken, refreshToken);
         }
@@ -232,7 +247,7 @@ public class AuthService {
      */
     public boolean isAuthenticated(HttpServletRequest request) {
         final String token = extractTokenFromHeader(request);
-        if ((token == null || !jwtService.isTokenValid(token)) && isBlacklisted(token) ) {
+        if (token == null || !jwtService.isTokenValid(token) || isBlacklisted(token)) {
             return false;
         }
 
@@ -263,7 +278,7 @@ public class AuthService {
      */
     public String getUsername(HttpServletRequest request) {
         final String token = extractTokenFromHeader(request);
-        if ((token == null || !jwtService.isTokenValid(token)) && isBlacklisted(token) ) {
+        if (token == null || !jwtService.isTokenValid(token) || isBlacklisted(token)) {
             return null;
         }
         return jwtService.extractUsername(token);

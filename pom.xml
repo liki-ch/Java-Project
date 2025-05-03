@@ -139,6 +139,12 @@
 			<version>3.5.24</version>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+    <groupId>me.paulschwarz</groupId>
+    <artifactId>spring-dotenv</artifactId>
+    <version>2.5.4</version>
+</dependency>
+
 	</dependencies>
 
 	<build>

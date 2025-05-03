@@ -13,7 +13,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmail(String email);
 
-    Optional<User> findByUsername(String username);
+    Optional<User> findByUsername(Long username);
 
     Optional<User> findByUsernameOrEmail(String username, String email);
 
@@ -24,4 +24,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "JOIN rp.permission p " +
             "WHERE u.username = :username")
     List<String> findPermissionNamesByUsername(@Param("username") String username);
+
+    Optional<User> findByUsername(String username);
 }

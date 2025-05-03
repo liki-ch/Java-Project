@@ -98,7 +98,7 @@ public class User {
     }
 
     public void removeAuditLog(AuditLog auditLog) {
-        oauthProviders.remove(auditLog);
+        auditLogs.remove(auditLog); // Fixed: use correct collection name
         auditLog.setUser(null);
     }
 
