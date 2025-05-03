@@ -105,8 +105,8 @@ public class AdminService {
 
 
     public String delegatePermissions(DelegateRequest request, String adminUsername) {
-        User user = userRepository.findByUsername(request.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found: " + request.getUserId()));
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + request.getUserId()));
 
         List<Role> roles = roleRepository.findByName(request.getRole());
         if (roles.isEmpty()) {
@@ -127,7 +127,7 @@ public class AdminService {
 
         user.getUserRoles().add(userRole);
         userRepository.save(user);
-        logAction(adminUsername, "Permissions delegated to " + request.getUserId());
+        logAction(adminUsername, "Permissions delegated to " + user.getUsername());
 
         return "Permissions delegated successfully";
     }
